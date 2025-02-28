@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
-using HotChocolate.Types.Analyzers.Filters;
 using HotChocolate.Types.Analyzers.Helpers;
 using HotChocolate.Types.Analyzers.Models;
 using Microsoft.CodeAnalysis;
@@ -9,20 +8,20 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace HotChocolate.Types.Analyzers.Inspectors;
 
-public class InterfaceTypeInfoInspector : ISyntaxInspector
+public class InterfaceTypeInfoInspector(string fullyQualifiedAttributeName) : IAttributeWithMetadataInspector
 {
-    public ImmutableArray<ISyntaxFilter> Filters { get; } = [TypeWithAttribute.Instance];
+    public string FullyQualifiedMetadataName => fullyQualifiedAttributeName;
 
-    public IImmutableSet<SyntaxKind> SupportedKinds { get; } = [SyntaxKind.ClassDeclaration];
+    public bool Predicate(SyntaxNode syntaxNode, CancellationToken cancellationToken) =>
+        syntaxNode is ClassDeclarationSyntax { AttributeLists.Count: > 0 };
 
-    public bool TryHandle(GeneratorSyntaxContext context, [NotNullWhen(true)] out SyntaxInfo? syntaxInfo)
+    public SyntaxInfo? Transform(GeneratorAttributeSyntaxContext context, CancellationToken cancellationToken)
     {
         var diagnostics = ImmutableArray<Diagnostic>.Empty;
 
         if (!IsInterfaceType(context, out var possibleType, out var classSymbol, out var runtimeType))
         {
-            syntaxInfo = null;
-            return false;
+            return null;
         }
 
         if (!possibleType.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword)))
@@ -72,57 +71,47 @@ public class InterfaceTypeInfoInspector : ISyntaxInspector
             Array.Resize(ref resolvers, i);
         }
 
-        syntaxInfo = new InterfaceTypeInfo(
+        var syntaxInfo = new InterfaceTypeExtensionInfo(
             classSymbol,
             runtimeType,
             possibleType,
             i == 0
                 ? ImmutableArray<Resolver>.Empty
-                : [..resolvers]);
+                : resolvers.ToImmutableArray());
 
         if (diagnostics.Length > 0)
         {
             syntaxInfo.AddDiagnosticRange(diagnostics);
         }
 
-        return true;
+        return syntaxInfo;
     }
 
-    private static bool IsInterfaceType(
-        GeneratorSyntaxContext context,
+    private bool IsInterfaceType(
+        GeneratorAttributeSyntaxContext context,
         [NotNullWhen(true)] out ClassDeclarationSyntax? resolverTypeSyntax,
         [NotNullWhen(true)] out INamedTypeSymbol? resolverTypeSymbol,
         [NotNullWhen(true)] out INamedTypeSymbol? runtimeType)
     {
-        if (context.Node is ClassDeclarationSyntax { AttributeLists.Count: > 0, } possibleType)
+        foreach (var attribute in context.Attributes)
         {
-            foreach (var attributeListSyntax in possibleType.AttributeLists)
+            if (attribute.AttributeConstructor is not { } attributeSymbol)
             {
-                foreach (var attributeSyntax in attributeListSyntax.Attributes)
-                {
-                    var symbol = ModelExtensions.GetSymbolInfo(context.SemanticModel, attributeSyntax).Symbol;
+                continue;
+            }
 
-                    if (symbol is not IMethodSymbol attributeSymbol)
-                    {
-                        continue;
-                    }
+            var attributeContainingTypeSymbol = attributeSymbol.ContainingType;
 
-                    var attributeContainingTypeSymbol = attributeSymbol.ContainingType;
-                    var fullName = attributeContainingTypeSymbol.ToDisplayString();
-
-                    // We do a start with here to capture the generic and non-generic variant of
-                    // the object type extension attribute.
-                    if (fullName.StartsWith(WellKnownAttributes.InterfaceTypeAttribute, StringComparison.Ordinal)
-                        && attributeContainingTypeSymbol.TypeArguments.Length == 1
-                        && attributeContainingTypeSymbol.TypeArguments[0] is INamedTypeSymbol rt
-                        && ModelExtensions.GetDeclaredSymbol(context.SemanticModel, possibleType) is INamedTypeSymbol rts)
-                    {
-                        resolverTypeSyntax = possibleType;
-                        resolverTypeSymbol = rts;
-                        runtimeType = rt;
-                        return true;
-                    }
-                }
+            if (fullyQualifiedAttributeName is WellKnownAttributes.InterfaceTypeAttribute or WellKnownAttributes.InterfaceTypeAttributeGeneric
+                && attributeContainingTypeSymbol.TypeArguments.Length == 1
+                && attributeContainingTypeSymbol.TypeArguments[0] is INamedTypeSymbol rt &&
+                context.TargetNode is ClassDeclarationSyntax possibleType
+                && context.TargetSymbol is INamedTypeSymbol rts)
+            {
+                resolverTypeSyntax = possibleType;
+                resolverTypeSymbol = rts;
+                runtimeType = rt;
+                return true;
             }
         }
 
@@ -133,7 +122,7 @@ public class InterfaceTypeInfoInspector : ISyntaxInspector
     }
 
     private static Resolver CreateResolver(
-        GeneratorSyntaxContext context,
+        GeneratorAttributeSyntaxContext context,
         INamedTypeSymbol resolverType,
         IMethodSymbol resolverMethod)
     {
@@ -150,7 +139,7 @@ public class InterfaceTypeInfoInspector : ISyntaxInspector
             resolverType.Name,
             resolverMethod,
             resolverMethod.GetResultKind(),
-            [..resolverParameters],
+            resolverParameters.ToImmutableArray(),
             ImmutableArray<MemberBinding>.Empty);
     }
 }

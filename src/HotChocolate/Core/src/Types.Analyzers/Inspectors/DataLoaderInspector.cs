@@ -1,55 +1,33 @@
-using System.Collections.Immutable;
-using System.Diagnostics.CodeAnalysis;
-using HotChocolate.Types.Analyzers.Filters;
 using HotChocolate.Types.Analyzers.Models;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using static System.StringComparison;
 
 namespace HotChocolate.Types.Analyzers.Inspectors;
 
-public sealed class DataLoaderInspector : ISyntaxInspector
+public sealed class DataLoaderInspector : IAttributeWithMetadataInspector
 {
-    public ImmutableArray<ISyntaxFilter> Filters { get; } = [MethodWithAttribute.Instance];
+    public string FullyQualifiedMetadataName => WellKnownAttributes.DataLoaderAttribute;
 
-    public IImmutableSet<SyntaxKind> SupportedKinds { get; } = [SyntaxKind.MethodDeclaration];
+    public bool Predicate(SyntaxNode syntaxNode, CancellationToken cancellationToken) =>
+        syntaxNode is MethodDeclarationSyntax { AttributeLists.Count: > 0 };
 
-    public bool TryHandle(
-        GeneratorSyntaxContext context,
-        [NotNullWhen(true)] out SyntaxInfo? syntaxInfo)
+    public SyntaxInfo? Transform(GeneratorAttributeSyntaxContext context, CancellationToken cancellationToken)
     {
-        if (context.Node is MethodDeclarationSyntax { AttributeLists.Count: > 0 } methodSyntax)
+        var methodSyntax = (MethodDeclarationSyntax)context.TargetNode;
+        foreach (var attribute in context.Attributes)
         {
-            foreach (var attributeListSyntax in methodSyntax.AttributeLists)
+            if (context.TargetSymbol is IMethodSymbol methodSymbol
+                && attribute.ApplicationSyntaxReference?.GetSyntax() is AttributeSyntax attributeSyntax
+                && attribute.AttributeConstructor is {} attributeConstructor)
             {
-                foreach (var attributeSyntax in attributeListSyntax.Attributes)
-                {
-                    var symbol = context.SemanticModel.GetSymbolInfo(attributeSyntax).Symbol;
-
-                    if (symbol is not IMethodSymbol attributeSymbol)
-                    {
-                        continue;
-                    }
-
-                    var attributeContainingTypeSymbol = attributeSymbol.ContainingType;
-                    var fullName = attributeContainingTypeSymbol.ToDisplayString();
-
-                    if (fullName.Equals(WellKnownAttributes.DataLoaderAttribute, Ordinal)
-                        && context.SemanticModel.GetDeclaredSymbol(methodSyntax) is { } methodSymbol)
-                    {
-                        syntaxInfo = new DataLoaderInfo(
-                            attributeSyntax,
-                            attributeSymbol,
-                            methodSymbol,
-                            methodSyntax);
-                        return true;
-                    }
-                }
+                return new DataLoaderInfo(
+                    attributeSyntax,
+                    attributeConstructor,
+                    methodSymbol,
+                    methodSyntax);
             }
         }
 
-        syntaxInfo = null;
-        return false;
+        return null;
     }
 }

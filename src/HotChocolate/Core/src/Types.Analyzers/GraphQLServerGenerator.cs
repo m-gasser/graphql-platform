@@ -16,10 +16,8 @@ public class GraphQLServerGenerator : IIncrementalGenerator
 {
     private static readonly ISyntaxInspector[] _allInspectors =
     [
-        new TypeAttributeInspector(),
         new ClassBaseClassInspector(),
         new ModuleInspector(),
-        new DataLoaderInspector(),
         new DataLoaderDefaultsInspector(),
         new DataLoaderModuleInspector(),
         new OperationInspector(),
@@ -32,6 +30,26 @@ public class GraphQLServerGenerator : IIncrementalGenerator
     private static readonly IPostCollectSyntaxTransformer[] _postCollectTransformers =
     [
         new ConnectionTypeTransformer()
+    ];
+
+    private static readonly IAttributeWithMetadataInspector[] _attributeInspectors =
+    [
+        new TypeAttributeInspector(WellKnownAttributes.ExtendObjectTypeAttribute),
+        new TypeAttributeInspector(WellKnownAttributes.ExtendObjectTypeAttributeGeneric),
+        new TypeAttributeInspector(WellKnownAttributes.QueryTypeAttribute),
+        new TypeAttributeInspector(WellKnownAttributes.MutationTypeAttribute),
+        new TypeAttributeInspector(WellKnownAttributes.SubscriptionTypeAttribute),
+        new DataLoaderInspector(),
+        new OperationInspector(WellKnownAttributes.QueryAttribute, OperationType.Query),
+        new OperationInspector(WellKnownAttributes.MutationAttribute, OperationType.Mutation),
+        new OperationInspector(WellKnownAttributes.SubscriptionAttribute, OperationType.Subscription),
+        new ObjectTypeInspector(WellKnownAttributes.ObjectTypeAttribute),
+        new ObjectTypeInspector(WellKnownAttributes.ObjectTypeAttributeGeneric),
+        new ObjectTypeInspector(WellKnownAttributes.QueryTypeAttribute),
+        new ObjectTypeInspector(WellKnownAttributes.MutationTypeAttribute),
+        new ObjectTypeInspector(WellKnownAttributes.SubscriptionTypeAttribute),
+        new InterfaceTypeInfoInspector(WellKnownAttributes.InterfaceTypeAttribute),
+        new InterfaceTypeInfoInspector(WellKnownAttributes.InterfaceTypeAttributeGeneric)
     ];
 
     private static readonly ISyntaxGenerator[] _generators =
@@ -78,12 +96,22 @@ public class GraphQLServerGenerator : IIncrementalGenerator
                     predicate: static (s, _) => Predicate(s),
                     transform: static (ctx, _) => Transform(ctx))
                 .WhereNotNull()
-                .WithComparer(SyntaxInfoComparer.Default)
-                .Collect();
+                .WithComparer(SyntaxInfoComparer.Default);
+
+        foreach (var inspector in _attributeInspectors)
+        {
+            var valuesProvider = context.SyntaxProvider.ForAttributeWithMetadataName(
+                    inspector.FullyQualifiedMetadataName,
+                    inspector.Predicate,
+                    inspector.Transform)
+                .WhereNotNull()
+                .WithComparer(SyntaxInfoComparer.Default);
+            syntaxInfos = syntaxInfos.Concat(valuesProvider);
+        }
 
         var postProcessedSyntaxInfos =
             context.CompilationProvider
-                .Combine(syntaxInfos)
+                .Combine(syntaxInfos.Collect())
                 .Select((ctx, _) => OnAfterCollect(ctx.Left, ctx.Right));
 
         var assemblyNameProvider = context.CompilationProvider
@@ -157,4 +185,11 @@ file static class Extensions
     public static IncrementalValuesProvider<SyntaxInfo> WhereNotNull(
         this IncrementalValuesProvider<SyntaxInfo?> source)
         => source.Where(static t => t is not null)!;
+
+    // Currently there is no easy way to concatenate IncrementalValuesProviders.
+    // See https://github.com/dotnet/roslyn/discussions/62761
+    public static IncrementalValuesProvider<TSource> Concat<TSource>(
+        this IncrementalValuesProvider<TSource> first,
+        IncrementalValuesProvider<TSource> second)
+        => first.Collect().Combine(second.Collect()).SelectMany((x, _) => x.Left.Concat(x.Right));
 }
