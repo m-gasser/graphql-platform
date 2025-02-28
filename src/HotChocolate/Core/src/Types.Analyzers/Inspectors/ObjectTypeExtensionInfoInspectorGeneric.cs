@@ -10,9 +10,9 @@ using static HotChocolate.Types.Analyzers.WellKnownAttributes;
 
 namespace HotChocolate.Types.Analyzers.Inspectors;
 
-public class ObjectTypeExtensionInfoInspector : IAttributeWithMetadataInspector
+public class ObjectTypeExtensionInfoInspectorGeneric : IAttributeWithMetadataInspector
 {
-    public string FullyQualifiedMetadataName => ObjectTypeAttribute;
+    public string FullyQualifiedMetadataName => ObjectTypeAttributeGeneric;
 
     public bool Predicate(SyntaxNode syntaxNode, CancellationToken cancellationToken) =>
         syntaxNode is ClassDeclarationSyntax { AttributeLists.Count: > 0 };
@@ -142,7 +142,7 @@ public class ObjectTypeExtensionInfoInspector : IAttributeWithMetadataInspector
 
             // We do a start with here to capture the generic and non-generic variant of
             // the object type extension attribute.
-            if (fullName.StartsWith(ObjectTypeAttribute, Ordinal) &&
+            if (fullName.StartsWith(ObjectTypeAttributeGeneric, Ordinal) &&
                 attributeContainingTypeSymbol.TypeArguments.Length == 1 &&
                 attributeContainingTypeSymbol.TypeArguments[0] is INamedTypeSymbol rt &&
                 context.TargetSymbol is INamedTypeSymbol rts &&

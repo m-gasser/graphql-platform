@@ -5,7 +5,9 @@ public static class WellKnownAttributes
     public const string ModuleAttribute = "HotChocolate.ModuleAttribute";
     public const string ExtendObjectTypeAttribute = "HotChocolate.Types.ExtendObjectTypeAttribute";
     public const string ObjectTypeAttribute = "HotChocolate.Types.ObjectTypeAttribute";
+    public const string ObjectTypeAttributeGeneric = ObjectTypeAttribute + GenericSuffix;
     public const string InterfaceTypeAttribute = "HotChocolate.Types.InterfaceTypeAttribute";
+    public const string InterfaceTypeAttributeGeneric = InterfaceTypeAttribute + GenericSuffix;
     public const string UnionTypeAttribute = "HotChocolate.Types.UnionTypeAttribute";
     public const string EnumTypeAttribute = "HotChocolate.Types.EnumTypeAttribute";
     public const string InputObjectTypeAttribute = "HotChocolate.Types.InputObjectTypeAttribute";
@@ -26,6 +28,8 @@ public static class WellKnownAttributes
     public const string ArgumentAttribute = "HotChocolate.ArgumentAttribute";
     public const string BindMemberAttribute = "HotChocolate.Types.BindMemberAttribute";
     public const string BindFieldAttribute = "HotChocolate.Types.BindFieldAttribute";
+
+    private const string GenericSuffix = "`1";
 
     public static HashSet<string> BindAttributes { get; } =
     [

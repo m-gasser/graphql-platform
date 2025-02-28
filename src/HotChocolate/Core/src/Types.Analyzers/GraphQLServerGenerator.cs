@@ -12,16 +12,22 @@ public class GraphQLServerGenerator : IIncrementalGenerator
 {
     private static readonly ISyntaxInspector[] _inspectors =
     [
-        new TypeAttributeInspector(),
         new ClassBaseClassInspector(),
         new ModuleInspector(),
-        new DataLoaderInspector(),
         new DataLoaderDefaultsInspector(),
         new DataLoaderModuleInspector(),
+        new RequestMiddlewareInspector()
+    ];
+
+    private static readonly IAttributeWithMetadataInspector[] _attributeInspectors =
+    [
+        new TypeAttributeInspector(),
+        new DataLoaderInspector(),
         new OperationInspector(),
         new ObjectTypeExtensionInfoInspector(),
+        new ObjectTypeExtensionInfoInspectorGeneric(),
         new InterfaceTypeInfoInspector(),
-        new RequestMiddlewareInspector()
+        new InterfaceTypeInfoInspectorGeneric()
     ];
 
     private static readonly ISyntaxGenerator[] _generators =
@@ -57,6 +63,19 @@ public class GraphQLServerGenerator : IIncrementalGenerator
                 .WhereNotNull()
                 .WithComparer(SyntaxInfoComparer.Default)
                 .Collect();
+
+        IncrementalValuesProvider<SyntaxInfo?>? attributeInspectorsValueProviders = null;
+        foreach (var inspector in _attributeInspectors)
+        {
+            var valuesProvider =
+                context.SyntaxProvider.ForAttributeWithMetadataName(
+                    inspector.FullyQualifiedMetadataName,
+                    inspector.Predicate,
+                    inspector.Transform);
+            attributeInspectorsValueProviders =
+                attributeInspectorsValueProviders?.Concat(valuesProvider) ?? valuesProvider;
+
+        }
 
         var assemblyNameProvider = context.CompilationProvider
             .Select(static (c, _) => c.AssemblyName!);
@@ -112,4 +131,11 @@ file static class Extensions
     public static IncrementalValuesProvider<SyntaxInfo> WhereNotNull(
         this IncrementalValuesProvider<SyntaxInfo?> source)
         => source.Where(static t => t is not null)!;
+
+    // Currently there is no easy way to concatenate IncrementalValuesProviders.
+    // See https://github.com/dotnet/roslyn/discussions/62761
+    public static IncrementalValuesProvider<TSource> Concat<TSource>(
+        this IncrementalValuesProvider<TSource> first,
+        IncrementalValuesProvider<TSource> second)
+        => first.Collect().Combine(second.Collect()).SelectMany((x, _) => x.Left.Concat(x.Right));
 }

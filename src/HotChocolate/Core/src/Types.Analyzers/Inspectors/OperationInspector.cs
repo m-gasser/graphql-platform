@@ -1,63 +1,40 @@
-using System.Diagnostics.CodeAnalysis;
-using HotChocolate.Types.Analyzers.Filters;
 using HotChocolate.Types.Analyzers.Models;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace HotChocolate.Types.Analyzers.Inspectors;
 
-public sealed class OperationInspector : ISyntaxInspector
+public sealed class OperationInspector : IAttributeWithMetadataInspector
 {
-    public IReadOnlyList<ISyntaxFilter> Filters => [MethodWithAttribute.Instance];
+    public string FullyQualifiedMetadataName => WellKnownAttributes.DataLoaderAttribute;
 
-    public bool TryHandle(
-        GeneratorSyntaxContext context,
-        [NotNullWhen(true)] out SyntaxInfo? syntaxInfo)
+    public bool Predicate(SyntaxNode syntaxNode, CancellationToken cancellationToken) =>
+        syntaxNode is MethodDeclarationSyntax { AttributeLists.Count: > 0 };
+
+    public SyntaxInfo? Transform(GeneratorAttributeSyntaxContext context, CancellationToken cancellationToken)
     {
-        if (context.Node is MethodDeclarationSyntax { AttributeLists.Count: > 0, } methodSyntax)
+        foreach (var attribute in context.Attributes)
         {
-            foreach (var attributeListSyntax in methodSyntax.AttributeLists)
+            if (context.TargetSymbol is IMethodSymbol {IsStatic:true} methodSymbol
+                && attribute.AttributeClass is {} attributeClass)
             {
-                foreach (var attributeSyntax in attributeListSyntax.Attributes)
+                var attributeContainingTypeSymbol = attributeClass.ContainingType;
+                var fullName = attributeContainingTypeSymbol.ToDisplayString();
+                var operationType = ParseOperationType(fullName);
+
+                if(operationType == OperationType.No)
                 {
-                    var symbol = context.SemanticModel.GetSymbolInfo(attributeSyntax).Symbol;
-
-                    if (symbol is not IMethodSymbol attributeSymbol)
-                    {
-                        continue;
-                    }
-
-                    var attributeContainingTypeSymbol = attributeSymbol.ContainingType;
-                    var fullName = attributeContainingTypeSymbol.ToDisplayString();
-                    var operationType = ParseOperationType(fullName);
-
-                    if(operationType == OperationType.No)
-                    {
-                        continue;
-                    }
-
-                    if (context.SemanticModel.GetDeclaredSymbol(methodSyntax) is not { } methodSymbol)
-                    {
-                        continue;
-                    }
-
-                    if (!methodSymbol.IsStatic)
-                    {
-                        continue;
-                    }
-
-                    syntaxInfo = new OperationInfo(
-                        operationType,
-                        methodSymbol.ContainingType.ToDisplayString(),
-                        methodSymbol.Name);
-                    return true;
+                    continue;
                 }
+
+                return new OperationInfo(
+                    operationType,
+                    methodSymbol.ContainingType.ToDisplayString(),
+                    methodSymbol.Name);
             }
         }
 
-        syntaxInfo = null;
-        return false;
+        return null;
     }
 
     private OperationType ParseOperationType(string attributeName)

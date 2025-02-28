@@ -8,9 +8,9 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace HotChocolate.Types.Analyzers.Inspectors;
 
-public class InterfaceTypeInfoInspector : IAttributeWithMetadataInspector
+public class InterfaceTypeInfoInspectorGeneric : IAttributeWithMetadataInspector
 {
-    public string FullyQualifiedMetadataName => WellKnownAttributes.InterfaceTypeAttribute;
+    public string FullyQualifiedMetadataName => WellKnownAttributes.InterfaceTypeAttributeGeneric;
 
     public bool Predicate(SyntaxNode syntaxNode, CancellationToken cancellationToken) =>
         syntaxNode is ClassDeclarationSyntax { AttributeLists.Count: > 0 };
@@ -105,7 +105,7 @@ public class InterfaceTypeInfoInspector : IAttributeWithMetadataInspector
 
             // We do a start with here to capture the generic and non-generic variant of
             // the object type extension attribute.
-            if (fullName.StartsWith(WellKnownAttributes.InterfaceTypeAttribute, StringComparison.Ordinal)
+            if (fullName.StartsWith(WellKnownAttributes.InterfaceTypeAttributeGeneric, StringComparison.Ordinal)
                 && attributeContainingTypeSymbol.TypeArguments.Length == 1
                 && attributeContainingTypeSymbol.TypeArguments[0] is INamedTypeSymbol rt &&
                 context.TargetNode is ClassDeclarationSyntax possibleType

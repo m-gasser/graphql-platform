@@ -1,5 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
-using HotChocolate.Types.Analyzers.Filters;
 using HotChocolate.Types.Analyzers.Models;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -10,98 +8,85 @@ using TypeInfo = HotChocolate.Types.Analyzers.Models.TypeInfo;
 
 namespace HotChocolate.Types.Analyzers.Inspectors;
 
-public sealed class TypeAttributeInspector : ISyntaxInspector
+public sealed class TypeAttributeInspector : IAttributeWithMetadataInspector
 {
-    public IReadOnlyList<ISyntaxFilter> Filters => [TypeWithAttribute.Instance];
+    public string FullyQualifiedMetadataName => ExtendObjectTypeAttribute;
 
-    public bool TryHandle(
-        GeneratorSyntaxContext context,
-        [NotNullWhen(true)] out SyntaxInfo? syntaxInfo)
+    public bool Predicate(SyntaxNode syntaxNode, CancellationToken cancellationToken) =>
+        syntaxNode is BaseTypeDeclarationSyntax { AttributeLists.Count: > 0, };
+
+    public SyntaxInfo? Transform(GeneratorAttributeSyntaxContext context, CancellationToken cancellationToken)
     {
-        if (context.Node is BaseTypeDeclarationSyntax { AttributeLists.Count: > 0, } possibleType)
+        var possibleType = (BaseTypeDeclarationSyntax)context.TargetNode;
+        foreach (var attributeSyntax in context.Attributes)
         {
-            foreach (var attributeListSyntax in possibleType.AttributeLists)
+            var attributeSymbol = attributeSyntax.AttributeConstructor;
+
+            if (attributeSymbol is null)
             {
-                foreach (var attributeSyntax in attributeListSyntax.Attributes)
+                continue;
+            }
+
+            var attributeContainingTypeSymbol = attributeSymbol.ContainingType;
+            var fullName = attributeContainingTypeSymbol.ToDisplayString();
+
+            // We do a startWith to capture the generic and non-generic variants of
+            // the object type extension attribute.
+            if (fullName.StartsWith(ExtendObjectTypeAttribute, Ordinal) &&
+                context.SemanticModel.GetDeclaredSymbol(possibleType) is { } typeExt)
+            {
+                return new TypeExtensionInfo(
+                    typeExt.ToDisplayString(),
+                    possibleType.Modifiers.Any(t => t.IsKind(SyntaxKind.StaticKeyword)));
+            }
+
+            if (attributeContainingTypeSymbol.TypeArguments.Length == 0 &&
+                TypeAttributes.Contains(fullName) &&
+                context.SemanticModel.GetDeclaredSymbol(possibleType) is { } type)
+            {
+                if (fullName.Equals(QueryTypeAttribute))
                 {
-                    var symbol = context.SemanticModel.GetSymbolInfo(attributeSyntax).Symbol;
-
-                    if (symbol is not IMethodSymbol attributeSymbol)
+                    if (type.IsStatic && possibleType.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword)))
                     {
-                        continue;
+                        return null;
                     }
 
-                    var attributeContainingTypeSymbol = attributeSymbol.ContainingType;
-                    var fullName = attributeContainingTypeSymbol.ToDisplayString();
-
-                    // We do a startWith to capture the generic and non-generic variants of
-                    // the object type extension attribute.
-                    if (fullName.StartsWith(ExtendObjectTypeAttribute, Ordinal) &&
-                        context.SemanticModel.GetDeclaredSymbol(possibleType) is { } typeExt)
-                    {
-                        syntaxInfo = new TypeExtensionInfo(
-                            typeExt.ToDisplayString(),
-                            possibleType.Modifiers.Any(t => t.IsKind(SyntaxKind.StaticKeyword)));
-                        return true;
-                    }
-
-                    if (attributeContainingTypeSymbol.TypeArguments.Length == 0 &&
-                        TypeAttributes.Contains(fullName) &&
-                        context.SemanticModel.GetDeclaredSymbol(possibleType) is { } type)
-                    {
-                        if (fullName.Equals(QueryTypeAttribute))
-                        {
-                            if (type.IsStatic && possibleType.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword)))
-                            {
-                                syntaxInfo = null;
-                                return false;
-                            }
-
-                            syntaxInfo = new TypeExtensionInfo(
-                                type.ToDisplayString(),
-                                possibleType.Modifiers.Any(t => t.IsKind(SyntaxKind.StaticKeyword)),
-                                OperationType.Query);
-                            return true;
-                        }
-
-                        if (fullName.Equals(MutationTypeAttribute))
-                        {
-                            if (type.IsStatic && possibleType.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword)))
-                            {
-                                syntaxInfo = null;
-                                return false;
-                            }
-
-                            syntaxInfo = new TypeExtensionInfo(
-                                type.ToDisplayString(),
-                                possibleType.Modifiers.Any(t => t.IsKind(SyntaxKind.StaticKeyword)),
-                                OperationType.Mutation);
-                            return true;
-                        }
-
-                        if (fullName.Equals(SubscriptionTypeAttribute))
-                        {
-                            if (type.IsStatic && possibleType.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword)))
-                            {
-                                syntaxInfo = null;
-                                return false;
-                            }
-
-                            syntaxInfo = new TypeExtensionInfo(
-                                type.ToDisplayString(),
-                                possibleType.Modifiers.Any(t => t.IsKind(SyntaxKind.StaticKeyword)),
-                                OperationType.Subscription);
-                            return true;
-                        }
-
-                        syntaxInfo = new TypeInfo(type.ToDisplayString());
-                        return true;
-                    }
+                    return new TypeExtensionInfo(
+                        type.ToDisplayString(),
+                        possibleType.Modifiers.Any(t => t.IsKind(SyntaxKind.StaticKeyword)),
+                        OperationType.Query);
                 }
+
+                if (fullName.Equals(MutationTypeAttribute))
+                {
+                    if (type.IsStatic && possibleType.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword)))
+                    {
+                        return null;
+                    }
+
+                    return new TypeExtensionInfo(
+                        type.ToDisplayString(),
+                        possibleType.Modifiers.Any(t => t.IsKind(SyntaxKind.StaticKeyword)),
+                        OperationType.Mutation);
+                }
+
+                if (fullName.Equals(SubscriptionTypeAttribute))
+                {
+                    if (type.IsStatic && possibleType.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword)))
+                    {
+                        return null;
+                    }
+
+                    return new TypeExtensionInfo(
+                        type.ToDisplayString(),
+                        possibleType.Modifiers.Any(t => t.IsKind(SyntaxKind.StaticKeyword)),
+                        OperationType.Subscription);
+                }
+
+                return new TypeInfo(type.ToDisplayString());
             }
         }
 
-        syntaxInfo = null;
-        return false;
+        return null;
     }
 }
