@@ -26,19 +26,17 @@ public sealed class TypeAttributeInspector(string fullyQualifiedAttributeName) :
                 continue;
             }
 
-            var attributeContainingTypeSymbol = attributeSymbol.ContainingType;
-
             if (fullyQualifiedAttributeName is ExtendObjectTypeAttribute or ExtendObjectTypeAttributeGeneric &&
-                context.SemanticModel.GetDeclaredSymbol(possibleType) is { } typeExt)
+                context.TargetSymbol is { } typeExt)
             {
                 return new TypeExtensionInfo(
                     typeExt.ToDisplayString(),
                     possibleType.Modifiers.Any(t => t.IsKind(SyntaxKind.StaticKeyword)));
             }
 
-            if (attributeContainingTypeSymbol.TypeArguments.Length == 0 &&
+            if (attributeSymbol.ContainingType.TypeArguments.Length == 0 &&
                 TypeAttributes.Contains(fullyQualifiedAttributeName) &&
-                context.SemanticModel.GetDeclaredSymbol(possibleType) is { } type)
+                context.TargetSymbol is { } type)
             {
                 if (fullyQualifiedAttributeName is QueryTypeAttribute)
                 {

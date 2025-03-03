@@ -172,29 +172,26 @@ public class ObjectTypeExtensionInfoInspector(string fullyQualifiedAttributeName
             && context.TargetSymbol is INamedTypeSymbol possibleSymbol
             && (possibleSymbol.IsStatic && possibleType.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword))))
         {
-            if (fullyQualifiedAttributeName is QueryTypeAttribute &&
-                ModelExtensions.GetDeclaredSymbol(context.SemanticModel, possibleType) is INamedTypeSymbol rtsq)
+            if (fullyQualifiedAttributeName is QueryTypeAttribute)
             {
                 resolverTypeSyntax = possibleType;
-                resolverTypeSymbol = rtsq;
+                resolverTypeSymbol = possibleSymbol;
                 operationType = OperationType.Query;
                 return true;
             }
 
-            if (fullyQualifiedAttributeName is MutationTypeAttribute &&
-                ModelExtensions.GetDeclaredSymbol(context.SemanticModel, possibleType) is INamedTypeSymbol rtsm)
+            if (fullyQualifiedAttributeName is MutationTypeAttribute)
             {
                 resolverTypeSyntax = possibleType;
-                resolverTypeSymbol = rtsm;
+                resolverTypeSymbol = possibleSymbol;
                 operationType = OperationType.Mutation;
                 return true;
             }
 
-            if (fullyQualifiedAttributeName is SubscriptionTypeAttribute &&
-                ModelExtensions.GetDeclaredSymbol(context.SemanticModel, possibleType) is INamedTypeSymbol rtss)
+            if (fullyQualifiedAttributeName is SubscriptionTypeAttribute)
             {
                 resolverTypeSyntax = possibleType;
-                resolverTypeSymbol = rtss;
+                resolverTypeSymbol = possibleSymbol;
                 operationType = OperationType.Subscription;
                 return true;
             }

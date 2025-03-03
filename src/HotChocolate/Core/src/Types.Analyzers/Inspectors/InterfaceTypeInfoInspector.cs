@@ -106,7 +106,7 @@ public class InterfaceTypeInfoInspector(string fullyQualifiedAttributeName) : IA
                 && attributeContainingTypeSymbol.TypeArguments.Length == 1
                 && attributeContainingTypeSymbol.TypeArguments[0] is INamedTypeSymbol rt &&
                 context.TargetNode is ClassDeclarationSyntax possibleType
-                && ModelExtensions.GetDeclaredSymbol(context.SemanticModel, possibleType) is INamedTypeSymbol rts)
+                && context.TargetSymbol is INamedTypeSymbol rts)
             {
                 resolverTypeSyntax = possibleType;
                 resolverTypeSymbol = rts;
