@@ -140,11 +140,8 @@ public class ObjectTypeExtensionInfoInspector(string fullyQualifiedAttributeName
                 }
 
                 var attributeContainingTypeSymbol = attributeSymbol.ContainingType;
-                var fullName = attributeContainingTypeSymbol.ToDisplayString();
 
-                // We do a start with here to capture the generic and non-generic variant of
-                // the object type extension attribute.
-                if (fullName.StartsWith(ObjectTypeAttribute, Ordinal) &&
+                if (fullyQualifiedAttributeName is ObjectTypeAttribute or ObjectTypeAttributeGeneric &&
                     attributeContainingTypeSymbol.TypeArguments.Length == 1 &&
                     attributeContainingTypeSymbol.TypeArguments[0] is INamedTypeSymbol rt &&
                     context.TargetSymbol is INamedTypeSymbol rts &&
@@ -175,42 +172,31 @@ public class ObjectTypeExtensionInfoInspector(string fullyQualifiedAttributeName
             && context.TargetSymbol is INamedTypeSymbol possibleSymbol
             && (possibleSymbol.IsStatic && possibleType.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword))))
         {
-            foreach (var attribute in context.Attributes)
+            if (fullyQualifiedAttributeName is QueryTypeAttribute &&
+                ModelExtensions.GetDeclaredSymbol(context.SemanticModel, possibleType) is INamedTypeSymbol rtsq)
             {
-                if (attribute.AttributeConstructor is not { } attributeSymbol)
-                {
-                    continue;
-                }
+                resolverTypeSyntax = possibleType;
+                resolverTypeSymbol = rtsq;
+                operationType = OperationType.Query;
+                return true;
+            }
 
-                var attributeContainingTypeSymbol = attributeSymbol.ContainingType;
-                var fullName = attributeContainingTypeSymbol.ToDisplayString();
+            if (fullyQualifiedAttributeName is MutationTypeAttribute &&
+                ModelExtensions.GetDeclaredSymbol(context.SemanticModel, possibleType) is INamedTypeSymbol rtsm)
+            {
+                resolverTypeSyntax = possibleType;
+                resolverTypeSymbol = rtsm;
+                operationType = OperationType.Mutation;
+                return true;
+            }
 
-                if (fullName.StartsWith(QueryTypeAttribute, Ordinal) &&
-                    ModelExtensions.GetDeclaredSymbol(context.SemanticModel, possibleType) is INamedTypeSymbol rtsq)
-                {
-                    resolverTypeSyntax = possibleType;
-                    resolverTypeSymbol = rtsq;
-                    operationType = OperationType.Query;
-                    return true;
-                }
-
-                if (fullName.StartsWith(MutationTypeAttribute, Ordinal) &&
-                    ModelExtensions.GetDeclaredSymbol(context.SemanticModel, possibleType) is INamedTypeSymbol rtsm)
-                {
-                    resolverTypeSyntax = possibleType;
-                    resolverTypeSymbol = rtsm;
-                    operationType = OperationType.Mutation;
-                    return true;
-                }
-
-                if (fullName.StartsWith(SubscriptionTypeAttribute, Ordinal) &&
-                    ModelExtensions.GetDeclaredSymbol(context.SemanticModel, possibleType) is INamedTypeSymbol rtss)
-                {
-                    resolverTypeSyntax = possibleType;
-                    resolverTypeSymbol = rtss;
-                    operationType = OperationType.Subscription;
-                    return true;
-                }
+            if (fullyQualifiedAttributeName is SubscriptionTypeAttribute &&
+                ModelExtensions.GetDeclaredSymbol(context.SemanticModel, possibleType) is INamedTypeSymbol rtss)
+            {
+                resolverTypeSyntax = possibleType;
+                resolverTypeSymbol = rtss;
+                operationType = OperationType.Subscription;
+                return true;
             }
         }
 

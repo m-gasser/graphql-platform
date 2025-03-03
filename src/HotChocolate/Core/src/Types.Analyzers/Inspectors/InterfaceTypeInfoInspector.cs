@@ -87,7 +87,7 @@ public class InterfaceTypeInfoInspector(string fullyQualifiedAttributeName) : IA
         return syntaxInfo;
     }
 
-    private static bool IsInterfaceType(
+    private bool IsInterfaceType(
         GeneratorAttributeSyntaxContext context,
         [NotNullWhen(true)] out ClassDeclarationSyntax? resolverTypeSyntax,
         [NotNullWhen(true)] out INamedTypeSymbol? resolverTypeSymbol,
@@ -101,11 +101,8 @@ public class InterfaceTypeInfoInspector(string fullyQualifiedAttributeName) : IA
             }
 
             var attributeContainingTypeSymbol = attributeSymbol.ContainingType;
-            var fullName = attributeContainingTypeSymbol.ToDisplayString();
 
-            // We do a start with here to capture the generic and non-generic variant of
-            // the object type extension attribute.
-            if (fullName.StartsWith(WellKnownAttributes.InterfaceTypeAttribute, StringComparison.Ordinal)
+            if (fullyQualifiedAttributeName is WellKnownAttributes.InterfaceTypeAttribute or WellKnownAttributes.InterfaceTypeAttributeGeneric
                 && attributeContainingTypeSymbol.TypeArguments.Length == 1
                 && attributeContainingTypeSymbol.TypeArguments[0] is INamedTypeSymbol rt &&
                 context.TargetNode is ClassDeclarationSyntax possibleType

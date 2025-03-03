@@ -2,7 +2,6 @@ using HotChocolate.Types.Analyzers.Models;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using static System.StringComparison;
 using static HotChocolate.Types.Analyzers.WellKnownAttributes;
 using TypeInfo = HotChocolate.Types.Analyzers.Models.TypeInfo;
 
@@ -28,11 +27,8 @@ public sealed class TypeAttributeInspector(string fullyQualifiedAttributeName) :
             }
 
             var attributeContainingTypeSymbol = attributeSymbol.ContainingType;
-            var fullName = attributeContainingTypeSymbol.ToDisplayString();
 
-            // We do a startWith to capture the generic and non-generic variants of
-            // the object type extension attribute.
-            if (fullName.StartsWith(ExtendObjectTypeAttribute, Ordinal) &&
+            if (fullyQualifiedAttributeName is ExtendObjectTypeAttribute or ExtendObjectTypeAttributeGeneric &&
                 context.SemanticModel.GetDeclaredSymbol(possibleType) is { } typeExt)
             {
                 return new TypeExtensionInfo(
@@ -41,10 +37,10 @@ public sealed class TypeAttributeInspector(string fullyQualifiedAttributeName) :
             }
 
             if (attributeContainingTypeSymbol.TypeArguments.Length == 0 &&
-                TypeAttributes.Contains(fullName) &&
+                TypeAttributes.Contains(fullyQualifiedAttributeName) &&
                 context.SemanticModel.GetDeclaredSymbol(possibleType) is { } type)
             {
-                if (fullName.Equals(QueryTypeAttribute))
+                if (fullyQualifiedAttributeName is QueryTypeAttribute)
                 {
                     if (type.IsStatic && possibleType.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword)))
                     {
@@ -57,7 +53,7 @@ public sealed class TypeAttributeInspector(string fullyQualifiedAttributeName) :
                         OperationType.Query);
                 }
 
-                if (fullName.Equals(MutationTypeAttribute))
+                if (fullyQualifiedAttributeName is MutationTypeAttribute)
                 {
                     if (type.IsStatic && possibleType.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword)))
                     {
@@ -70,7 +66,7 @@ public sealed class TypeAttributeInspector(string fullyQualifiedAttributeName) :
                         OperationType.Mutation);
                 }
 
-                if (fullName.Equals(SubscriptionTypeAttribute))
+                if (fullyQualifiedAttributeName is SubscriptionTypeAttribute)
                 {
                     if (type.IsStatic && possibleType.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword)))
                     {

@@ -41,8 +41,11 @@ public static class WellKnownAttributes
     public static HashSet<string> TypeAttributes { get; } =
     [
         ExtendObjectTypeAttribute,
+        ExtendObjectTypeAttributeGeneric,
         ObjectTypeAttribute,
+        ObjectTypeAttributeGeneric,
         InterfaceTypeAttribute,
+        InterfaceTypeAttributeGeneric,
         UnionTypeAttribute,
         EnumTypeAttribute,
         InputObjectTypeAttribute,
