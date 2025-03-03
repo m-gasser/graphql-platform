@@ -17,62 +17,6 @@ using HotChocolate.Internal;
 
 namespace TestNamespace
 {
-    internal static class QueryResolvers
-    {
-        private static readonly object _sync = new object();
-        private static bool _bindingsInitialized;
-        private readonly static global::HotChocolate.Internal.IParameterBinding[] _args_Query_GetTestById = new global::HotChocolate.Internal.IParameterBinding[1];
-
-        public static void InitializeBindings(global::HotChocolate.Internal.IParameterBindingResolver bindingResolver)
-        {
-            if (!_bindingsInitialized)
-            {
-                lock (_sync)
-                {
-                    if (!_bindingsInitialized)
-                    {
-                        const global::System.Reflection.BindingFlags bindingFlags =
-                            global::System.Reflection.BindingFlags.Public
-                                | global::System.Reflection.BindingFlags.NonPublic
-                                | global::System.Reflection.BindingFlags.Static;
-
-                        var type = typeof(global::TestNamespace.Query);
-                        global::System.Reflection.MethodInfo resolver = default!;
-                        global::System.Reflection.ParameterInfo[] parameters = default!;
-                        _bindingsInitialized = true;
-
-                        resolver = type.GetMethod(
-                            "GetTestById",
-                            bindingFlags,
-                            new global::System.Type[]
-                            {
-                                typeof(int)
-                            })!;
-                        parameters = resolver.GetParameters();
-                        _args_Query_GetTestById[0] = bindingResolver.GetBinding(parameters[0]);
-                    }
-                }
-            }
-        }
-
-        public static HotChocolate.Resolvers.FieldResolverDelegates Query_GetTestById()
-        {
-            if(!_bindingsInitialized)
-            {
-                throw new global::System.InvalidOperationException("The bindings must be initialized before the resolvers can be created.");
-            }
-
-            return new global::HotChocolate.Resolvers.FieldResolverDelegates(resolver: Query_GetTestById_Resolver);
-        }
-
-        private static async global::System.Threading.Tasks.ValueTask<global::System.Object?> Query_GetTestById_Resolver(global::HotChocolate.Resolvers.IResolverContext context)
-        {
-            var args0 = _args_Query_GetTestById[0].Execute<int>(context);
-            var result = await global::TestNamespace.Query.GetTestById(args0);
-            return result;
-        }
-    }
-
     internal static class TestTypeResolvers
     {
         private static readonly object _sync = new object();
@@ -146,6 +90,62 @@ namespace TestNamespace
             return result;
         }
     }
+
+    internal static class QueryResolvers
+    {
+        private static readonly object _sync = new object();
+        private static bool _bindingsInitialized;
+        private readonly static global::HotChocolate.Internal.IParameterBinding[] _args_Query_GetTestById = new global::HotChocolate.Internal.IParameterBinding[1];
+
+        public static void InitializeBindings(global::HotChocolate.Internal.IParameterBindingResolver bindingResolver)
+        {
+            if (!_bindingsInitialized)
+            {
+                lock (_sync)
+                {
+                    if (!_bindingsInitialized)
+                    {
+                        const global::System.Reflection.BindingFlags bindingFlags =
+                            global::System.Reflection.BindingFlags.Public
+                                | global::System.Reflection.BindingFlags.NonPublic
+                                | global::System.Reflection.BindingFlags.Static;
+
+                        var type = typeof(global::TestNamespace.Query);
+                        global::System.Reflection.MethodInfo resolver = default!;
+                        global::System.Reflection.ParameterInfo[] parameters = default!;
+                        _bindingsInitialized = true;
+
+                        resolver = type.GetMethod(
+                            "GetTestById",
+                            bindingFlags,
+                            new global::System.Type[]
+                            {
+                                typeof(int)
+                            })!;
+                        parameters = resolver.GetParameters();
+                        _args_Query_GetTestById[0] = bindingResolver.GetBinding(parameters[0]);
+                    }
+                }
+            }
+        }
+
+        public static HotChocolate.Resolvers.FieldResolverDelegates Query_GetTestById()
+        {
+            if(!_bindingsInitialized)
+            {
+                throw new global::System.InvalidOperationException("The bindings must be initialized before the resolvers can be created.");
+            }
+
+            return new global::HotChocolate.Resolvers.FieldResolverDelegates(resolver: Query_GetTestById_Resolver);
+        }
+
+        private static async global::System.Threading.Tasks.ValueTask<global::System.Object?> Query_GetTestById_Resolver(global::HotChocolate.Resolvers.IResolverContext context)
+        {
+            var args0 = _args_Query_GetTestById[0].Execute<int>(context);
+            var result = await global::TestNamespace.Query.GetTestById(args0);
+            return result;
+        }
+    }
 }
 
 
@@ -208,6 +208,29 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace TestNamespace
 {
+public static partial class TestType
+{
+    internal static void Initialize(global::HotChocolate.Types.IObjectTypeDescriptor<global::TestNamespace.Test> descriptor)
+    {
+        const global::System.Reflection.BindingFlags bindingFlags =
+            global::System.Reflection.BindingFlags.Public
+                | global::System.Reflection.BindingFlags.NonPublic
+                | global::System.Reflection.BindingFlags.Static;
+
+        var thisType = typeof(global::TestNamespace.TestType);
+        var bindingResolver = descriptor.Extend().Context.ParameterBindingResolver;
+        global::TestNamespace.TestTypeResolvers.InitializeBindings(bindingResolver);
+
+        descriptor
+            .ImplementsNode()
+            .ResolveNode(global::TestNamespace.TestTypeResolvers.TestType_GetTest().Resolver!);
+
+        Configure(descriptor);
+    }
+
+    static partial void Configure(global::HotChocolate.Types.IObjectTypeDescriptor<global::TestNamespace.Test> descriptor);
+}
+
 public static partial class Query
 {
     internal static void Initialize(global::HotChocolate.Types.IObjectTypeDescriptor descriptor)
@@ -233,29 +256,6 @@ public static partial class Query
     }
 
     static partial void Configure(global::HotChocolate.Types.IObjectTypeDescriptor descriptor);
-}
-
-public static partial class TestType
-{
-    internal static void Initialize(global::HotChocolate.Types.IObjectTypeDescriptor<global::TestNamespace.Test> descriptor)
-    {
-        const global::System.Reflection.BindingFlags bindingFlags =
-            global::System.Reflection.BindingFlags.Public
-                | global::System.Reflection.BindingFlags.NonPublic
-                | global::System.Reflection.BindingFlags.Static;
-
-        var thisType = typeof(global::TestNamespace.TestType);
-        var bindingResolver = descriptor.Extend().Context.ParameterBindingResolver;
-        global::TestNamespace.TestTypeResolvers.InitializeBindings(bindingResolver);
-
-        descriptor
-            .ImplementsNode()
-            .ResolveNode(global::TestNamespace.TestTypeResolvers.TestType_GetTest().Resolver!);
-
-        Configure(descriptor);
-    }
-
-    static partial void Configure(global::HotChocolate.Types.IObjectTypeDescriptor<global::TestNamespace.Test> descriptor);
 }
 }
 

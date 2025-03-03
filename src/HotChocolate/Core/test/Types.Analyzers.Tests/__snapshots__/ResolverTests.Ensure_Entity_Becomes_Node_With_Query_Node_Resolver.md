@@ -17,15 +17,6 @@ using HotChocolate.Internal;
 
 namespace TestNamespace
 {
-    internal static class QueryResolvers
-    {
-        private static readonly object _sync = new object();
-        private static bool _bindingsInitialized;
-        public static void InitializeBindings(global::HotChocolate.Internal.IParameterBindingResolver bindingResolver)
-        {
-        }
-    }
-
     internal static class TestTypeResolvers
     {
         private static readonly object _sync = new object();
@@ -79,6 +70,15 @@ namespace TestNamespace
             var args0 = _args_TestType_GetTest[0].Execute<int>(context);
             var result = await global::TestNamespace.TestType.GetTest(args0);
             return result;
+        }
+    }
+
+    internal static class QueryResolvers
+    {
+        private static readonly object _sync = new object();
+        private static bool _bindingsInitialized;
+        public static void InitializeBindings(global::HotChocolate.Internal.IParameterBindingResolver bindingResolver)
+        {
         }
     }
 }
@@ -143,17 +143,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace TestNamespace
 {
-public static partial class Query
-{
-    internal static void Initialize(global::HotChocolate.Types.IObjectTypeDescriptor descriptor)
-    {
-
-        Configure(descriptor);
-    }
-
-    static partial void Configure(global::HotChocolate.Types.IObjectTypeDescriptor descriptor);
-}
-
 public static partial class TestType
 {
     internal static void Initialize(global::HotChocolate.Types.IObjectTypeDescriptor<global::TestNamespace.Test> descriptor)
@@ -179,6 +168,17 @@ public static partial class TestType
     }
 
     static partial void Configure(global::HotChocolate.Types.IObjectTypeDescriptor<global::TestNamespace.Test> descriptor);
+}
+
+public static partial class Query
+{
+    internal static void Initialize(global::HotChocolate.Types.IObjectTypeDescriptor descriptor)
+    {
+
+        Configure(descriptor);
+    }
+
+    static partial void Configure(global::HotChocolate.Types.IObjectTypeDescriptor descriptor);
 }
 }
 
