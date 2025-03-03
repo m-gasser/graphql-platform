@@ -10,9 +10,9 @@ using static HotChocolate.Types.Analyzers.WellKnownAttributes;
 
 namespace HotChocolate.Types.Analyzers.Inspectors;
 
-public class ObjectTypeExtensionInfoInspector : IAttributeWithMetadataInspector
+public class ObjectTypeExtensionInfoInspector(string fullyQualifiedAttributeName) : IAttributeWithMetadataInspector
 {
-    public string FullyQualifiedMetadataName => ObjectTypeAttribute;
+    public string FullyQualifiedMetadataName => fullyQualifiedAttributeName;
 
     public bool Predicate(SyntaxNode syntaxNode, CancellationToken cancellationToken) =>
         syntaxNode is ClassDeclarationSyntax { AttributeLists.Count: > 0 };
@@ -124,34 +124,37 @@ public class ObjectTypeExtensionInfoInspector : IAttributeWithMetadataInspector
         }
     }
 
-    private static bool IsObjectTypeExtension(
+    private bool IsObjectTypeExtension(
         GeneratorAttributeSyntaxContext context,
         [NotNullWhen(true)] out ClassDeclarationSyntax? resolverTypeSyntax,
         [NotNullWhen(true)] out INamedTypeSymbol? resolverTypeSymbol,
         [NotNullWhen(true)] out INamedTypeSymbol? runtimeType)
     {
-        foreach (var attribute in context.Attributes)
+        if (fullyQualifiedAttributeName is ObjectTypeAttribute or ObjectTypeAttributeGeneric)
         {
-            if (attribute.AttributeConstructor is not { } attributeSymbol)
+            foreach (var attribute in context.Attributes)
             {
-                continue;
-            }
+                if (attribute.AttributeConstructor is not { } attributeSymbol)
+                {
+                    continue;
+                }
 
-            var attributeContainingTypeSymbol = attributeSymbol.ContainingType;
-            var fullName = attributeContainingTypeSymbol.ToDisplayString();
+                var attributeContainingTypeSymbol = attributeSymbol.ContainingType;
+                var fullName = attributeContainingTypeSymbol.ToDisplayString();
 
-            // We do a start with here to capture the generic and non-generic variant of
-            // the object type extension attribute.
-            if (fullName.StartsWith(ObjectTypeAttribute, Ordinal) &&
-                attributeContainingTypeSymbol.TypeArguments.Length == 1 &&
-                attributeContainingTypeSymbol.TypeArguments[0] is INamedTypeSymbol rt &&
-                context.TargetSymbol is INamedTypeSymbol rts &&
-                context.TargetNode is ClassDeclarationSyntax possibleType)
-            {
-                resolverTypeSyntax = possibleType;
-                resolverTypeSymbol = rts;
-                runtimeType = rt;
-                return true;
+                // We do a start with here to capture the generic and non-generic variant of
+                // the object type extension attribute.
+                if (fullName.StartsWith(ObjectTypeAttribute, Ordinal) &&
+                    attributeContainingTypeSymbol.TypeArguments.Length == 1 &&
+                    attributeContainingTypeSymbol.TypeArguments[0] is INamedTypeSymbol rt &&
+                    context.TargetSymbol is INamedTypeSymbol rts &&
+                    context.TargetNode is ClassDeclarationSyntax possibleType)
+                {
+                    resolverTypeSyntax = possibleType;
+                    resolverTypeSymbol = rts;
+                    runtimeType = rt;
+                    return true;
+                }
             }
         }
 
@@ -161,48 +164,53 @@ public class ObjectTypeExtensionInfoInspector : IAttributeWithMetadataInspector
         return false;
     }
 
-    private static bool IsOperationType(
+    private bool IsOperationType(
         GeneratorAttributeSyntaxContext context,
         [NotNullWhen(true)] out ClassDeclarationSyntax? resolverTypeSyntax,
         [NotNullWhen(true)] out INamedTypeSymbol? resolverTypeSymbol,
         [NotNullWhen(true)] out OperationType? operationType)
     {
-        foreach (var attribute in context.Attributes)
+        if (fullyQualifiedAttributeName is QueryTypeAttribute or MutationAttribute or SubscriptionTypeAttribute
+            && context.TargetNode is ClassDeclarationSyntax possibleType
+            && context.TargetSymbol is INamedTypeSymbol possibleSymbol
+            && (possibleSymbol.IsStatic && possibleType.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword))))
         {
-            if (attribute.AttributeConstructor is not { } attributeSymbol ||
-                context.TargetNode is not ClassDeclarationSyntax possibleType)
+            foreach (var attribute in context.Attributes)
             {
-                continue;
-            }
+                if (attribute.AttributeConstructor is not { } attributeSymbol)
+                {
+                    continue;
+                }
 
-            var attributeContainingTypeSymbol = attributeSymbol.ContainingType;
-            var fullName = attributeContainingTypeSymbol.ToDisplayString();
+                var attributeContainingTypeSymbol = attributeSymbol.ContainingType;
+                var fullName = attributeContainingTypeSymbol.ToDisplayString();
 
-            if (fullName.StartsWith(QueryTypeAttribute, Ordinal) &&
-                ModelExtensions.GetDeclaredSymbol(context.SemanticModel, possibleType) is INamedTypeSymbol rtsq)
-            {
-                resolverTypeSyntax = possibleType;
-                resolverTypeSymbol = rtsq;
-                operationType = OperationType.Query;
-                return true;
-            }
+                if (fullName.StartsWith(QueryTypeAttribute, Ordinal) &&
+                    ModelExtensions.GetDeclaredSymbol(context.SemanticModel, possibleType) is INamedTypeSymbol rtsq)
+                {
+                    resolverTypeSyntax = possibleType;
+                    resolverTypeSymbol = rtsq;
+                    operationType = OperationType.Query;
+                    return true;
+                }
 
-            if (fullName.StartsWith(MutationTypeAttribute, Ordinal) &&
-                ModelExtensions.GetDeclaredSymbol(context.SemanticModel, possibleType) is INamedTypeSymbol rtsm)
-            {
-                resolverTypeSyntax = possibleType;
-                resolverTypeSymbol = rtsm;
-                operationType = OperationType.Mutation;
-                return true;
-            }
+                if (fullName.StartsWith(MutationTypeAttribute, Ordinal) &&
+                    ModelExtensions.GetDeclaredSymbol(context.SemanticModel, possibleType) is INamedTypeSymbol rtsm)
+                {
+                    resolverTypeSyntax = possibleType;
+                    resolverTypeSymbol = rtsm;
+                    operationType = OperationType.Mutation;
+                    return true;
+                }
 
-            if (fullName.StartsWith(SubscriptionTypeAttribute, Ordinal) &&
-                ModelExtensions.GetDeclaredSymbol(context.SemanticModel, possibleType) is INamedTypeSymbol rtss)
-            {
-                resolverTypeSyntax = possibleType;
-                resolverTypeSymbol = rtss;
-                operationType = OperationType.Subscription;
-                return true;
+                if (fullName.StartsWith(SubscriptionTypeAttribute, Ordinal) &&
+                    ModelExtensions.GetDeclaredSymbol(context.SemanticModel, possibleType) is INamedTypeSymbol rtss)
+                {
+                    resolverTypeSyntax = possibleType;
+                    resolverTypeSymbol = rtss;
+                    operationType = OperationType.Subscription;
+                    return true;
+                }
             }
         }
 

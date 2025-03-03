@@ -8,9 +8,9 @@ using TypeInfo = HotChocolate.Types.Analyzers.Models.TypeInfo;
 
 namespace HotChocolate.Types.Analyzers.Inspectors;
 
-public sealed class TypeAttributeInspector : IAttributeWithMetadataInspector
+public sealed class TypeAttributeInspector(string fullyQualifiedAttributeName) : IAttributeWithMetadataInspector
 {
-    public string FullyQualifiedMetadataName => ExtendObjectTypeAttribute;
+    public string FullyQualifiedMetadataName => fullyQualifiedAttributeName;
 
     public bool Predicate(SyntaxNode syntaxNode, CancellationToken cancellationToken) =>
         syntaxNode is BaseTypeDeclarationSyntax { AttributeLists.Count: > 0, };

@@ -21,13 +21,21 @@ public class GraphQLServerGenerator : IIncrementalGenerator
 
     private static readonly IAttributeWithMetadataInspector[] _attributeInspectors =
     [
-        new TypeAttributeInspector(),
+        new TypeAttributeInspector(WellKnownAttributes.ExtendObjectTypeAttribute),
+        new TypeAttributeInspector(WellKnownAttributes.QueryTypeAttribute),
+        new TypeAttributeInspector(WellKnownAttributes.MutationTypeAttribute),
+        new TypeAttributeInspector(WellKnownAttributes.SubscriptionTypeAttribute),
         new DataLoaderInspector(),
-        new OperationInspector(),
-        new ObjectTypeExtensionInfoInspector(),
-        new ObjectTypeExtensionInfoInspectorGeneric(),
-        new InterfaceTypeInfoInspector(),
-        new InterfaceTypeInfoInspectorGeneric()
+        new OperationInspector(OperationType.Query),
+        new OperationInspector(OperationType.Mutation),
+        new OperationInspector(OperationType.Subscription),
+        new ObjectTypeExtensionInfoInspector(WellKnownAttributes.ObjectTypeAttribute),
+        new ObjectTypeExtensionInfoInspector(WellKnownAttributes.ObjectTypeAttributeGeneric),
+        new ObjectTypeExtensionInfoInspector(WellKnownAttributes.QueryTypeAttribute),
+        new ObjectTypeExtensionInfoInspector(WellKnownAttributes.MutationTypeAttribute),
+        new ObjectTypeExtensionInfoInspector(WellKnownAttributes.SubscriptionTypeAttribute),
+        new InterfaceTypeInfoInspector(WellKnownAttributes.InterfaceTypeAttribute),
+        new InterfaceTypeInfoInspector(WellKnownAttributes.InterfaceTypeAttributeGeneric)
     ];
 
     private static readonly ISyntaxGenerator[] _generators =
@@ -61,26 +69,23 @@ public class GraphQLServerGenerator : IIncrementalGenerator
                     predicate: static (s, _) => Predicate(s),
                     transform: static (ctx, _) => Transform(ctx))
                 .WhereNotNull()
-                .WithComparer(SyntaxInfoComparer.Default)
-                .Collect();
+                .WithComparer(SyntaxInfoComparer.Default);
 
-        IncrementalValuesProvider<SyntaxInfo?>? attributeInspectorsValueProviders = null;
         foreach (var inspector in _attributeInspectors)
         {
-            var valuesProvider =
-                context.SyntaxProvider.ForAttributeWithMetadataName(
+            var valuesProvider = context.SyntaxProvider.ForAttributeWithMetadataName(
                     inspector.FullyQualifiedMetadataName,
                     inspector.Predicate,
-                    inspector.Transform);
-            attributeInspectorsValueProviders =
-                attributeInspectorsValueProviders?.Concat(valuesProvider) ?? valuesProvider;
-
+                    inspector.Transform)
+                .WhereNotNull()
+                .WithComparer(SyntaxInfoComparer.Default);
+            syntaxInfos = syntaxInfos.Concat(valuesProvider);
         }
 
         var assemblyNameProvider = context.CompilationProvider
             .Select(static (c, _) => c.AssemblyName!);
 
-        var valueProvider = assemblyNameProvider.Combine(syntaxInfos);
+        var valueProvider = assemblyNameProvider.Combine(syntaxInfos.Collect());
 
         context.RegisterSourceOutput(
             valueProvider,

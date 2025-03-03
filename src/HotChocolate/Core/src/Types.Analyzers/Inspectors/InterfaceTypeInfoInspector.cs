@@ -8,9 +8,9 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace HotChocolate.Types.Analyzers.Inspectors;
 
-public class InterfaceTypeInfoInspector : IAttributeWithMetadataInspector
+public class InterfaceTypeInfoInspector(string fullyQualifiedAttributeName) : IAttributeWithMetadataInspector
 {
-    public string FullyQualifiedMetadataName => WellKnownAttributes.InterfaceTypeAttribute;
+    public string FullyQualifiedMetadataName => fullyQualifiedAttributeName;
 
     public bool Predicate(SyntaxNode syntaxNode, CancellationToken cancellationToken) =>
         syntaxNode is ClassDeclarationSyntax { AttributeLists.Count: > 0 };
