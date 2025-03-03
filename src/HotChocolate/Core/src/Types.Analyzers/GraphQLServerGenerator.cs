@@ -22,6 +22,7 @@ public class GraphQLServerGenerator : IIncrementalGenerator
     private static readonly IAttributeWithMetadataInspector[] _attributeInspectors =
     [
         new TypeAttributeInspector(WellKnownAttributes.ExtendObjectTypeAttribute),
+        new TypeAttributeInspector(WellKnownAttributes.ExtendObjectTypeAttributeGeneric),
         new TypeAttributeInspector(WellKnownAttributes.QueryTypeAttribute),
         new TypeAttributeInspector(WellKnownAttributes.MutationTypeAttribute),
         new TypeAttributeInspector(WellKnownAttributes.SubscriptionTypeAttribute),

@@ -4,6 +4,7 @@ public static class WellKnownAttributes
 {
     public const string ModuleAttribute = "HotChocolate.ModuleAttribute";
     public const string ExtendObjectTypeAttribute = "HotChocolate.Types.ExtendObjectTypeAttribute";
+    public const string ExtendObjectTypeAttributeGeneric = ExtendObjectTypeAttribute + GenericSuffix;
     public const string ObjectTypeAttribute = "HotChocolate.Types.ObjectTypeAttribute";
     public const string ObjectTypeAttributeGeneric = ObjectTypeAttribute + GenericSuffix;
     public const string InterfaceTypeAttribute = "HotChocolate.Types.InterfaceTypeAttribute";
