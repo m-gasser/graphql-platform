@@ -17,60 +17,66 @@ public class ClassBaseClassInspector : ISyntaxInspector
         GeneratorSyntaxContext context,
         [NotNullWhen(true)] out SyntaxInfo? syntaxInfo)
     {
-        if (context.Node is ClassDeclarationSyntax { BaseList: { Types.Count: > 0 } baseList, TypeParameterList: null, } possibleType)
+        if (context.Node is not ClassDeclarationSyntax { BaseList: { Types.Count: > 0 } baseList, TypeParameterList: null, } possibleType)
         {
-            var relevantBaseTypes = WellKnownTypes.TypeClass
-                .SelectMany(n => context.SemanticModel.Compilation.GetTypesByMetadataName(n))
-                .ToImmutableHashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+            syntaxInfo = null;
+            return false;
+        }
 
-            foreach (var baseTypeSyntax in baseList.Types)
+        var baseTypeSymbols = baseList.Types
+            .Select(t => context.SemanticModel.GetSymbolInfo(t.Type).Symbol)
+            .OfType<ITypeSymbol>()
+            .ToList();
+        if (baseTypeSymbols.All(t => t.ContainingNamespace.ConstituentNamespaces[0].Name is not ("HotChocolate" or "GreenDonut")))
+        {
+            syntaxInfo = null;
+            return false;
+        }
+
+        foreach (var baseTypeSymbol in baseTypeSymbols)
+        {
+            if (WellKnownTypes.TypeClass
+                .SelectMany(n => context.SemanticModel.Compilation.GetTypesByMetadataName(n))
+                .Any(t => context.SemanticModel.Compilation.HasImplicitConversion(baseTypeSymbol, t)))
             {
-                if(context.SemanticModel.GetSymbolInfo(baseTypeSyntax.Type).Symbol is ITypeSymbol baseTypeSymbol &&
-                    relevantBaseTypes.Any(t => context.SemanticModel.Compilation.HasImplicitConversion(baseTypeSymbol, t)))
+                var model = context.SemanticModel.GetDeclaredSymbol(possibleType);
+                if (model is { IsAbstract: false, })
                 {
-                    var model = context.SemanticModel.GetDeclaredSymbol(possibleType);
-                    if (model is { IsAbstract: false, })
-                    {
-                        var typeDisplayString = model.ToDisplayString();
-                        syntaxInfo = new TypeInfo(typeDisplayString);
-                        return true;
-                    }
+                    var typeDisplayString = model.ToDisplayString();
+                    syntaxInfo = new TypeInfo(typeDisplayString);
+                    return true;
                 }
             }
-            var relevantExtensionBaseTypes = WellKnownTypes.TypeExtensionClass
-                .SelectMany(n => context.SemanticModel.Compilation.GetTypesByMetadataName(n))
-                .ToImmutableHashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+        }
 
-            foreach (var baseTypeSyntax in baseList.Types)
+        foreach (var baseTypeSymbol in baseTypeSymbols)
+        {
+            if (WellKnownTypes.TypeExtensionClass
+                .SelectMany(n => context.SemanticModel.Compilation.GetTypesByMetadataName(n))
+                .Any(t => context.SemanticModel.Compilation.HasImplicitConversion(baseTypeSymbol, t)))
             {
-                if(context.SemanticModel.GetSymbolInfo(baseTypeSyntax.Type).Symbol is ITypeSymbol baseTypeSymbol &&
-                    relevantExtensionBaseTypes.Any(t => context.SemanticModel.Compilation.HasImplicitConversion(baseTypeSymbol, t)))
+                var model = context.SemanticModel.GetDeclaredSymbol(possibleType);
+                if (model is { IsAbstract: false, })
                 {
-                    var model = context.SemanticModel.GetDeclaredSymbol(possibleType);
-                    if (model is { IsAbstract: false, })
-                    {
-                        var typeDisplayString = model.ToDisplayString();
-                        syntaxInfo = new TypeExtensionInfo(typeDisplayString, false);
-                        return true;
-                    }
+                    var typeDisplayString = model.ToDisplayString();
+                    syntaxInfo = new TypeExtensionInfo(typeDisplayString, false);
+                    return true;
                 }
             }
+        }
 
-            var relevantDataLoaderBaseTypes = context.SemanticModel.Compilation.GetTypesByMetadataName(WellKnownTypes.DataLoader)
-                .ToImmutableHashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
-
-            foreach (var baseTypeSyntax in baseList.Types)
+        foreach (var baseTypeSymbol in baseTypeSymbols)
+        {
+            if (context.SemanticModel.Compilation
+                .GetTypesByMetadataName(WellKnownTypes.DataLoader)
+                .Any(t => context.SemanticModel.Compilation.HasImplicitConversion(baseTypeSymbol, t)))
             {
-                if(context.SemanticModel.GetSymbolInfo(baseTypeSyntax.Type).Symbol is ITypeSymbol baseTypeSymbol &&
-                    relevantDataLoaderBaseTypes.Any(t => context.SemanticModel.Compilation.HasImplicitConversion(baseTypeSymbol, t)))
+                var model = context.SemanticModel.GetDeclaredSymbol(possibleType);
+                if (model is { IsAbstract: false, })
                 {
-                    var model = context.SemanticModel.GetDeclaredSymbol(possibleType);
-                    if (model is { IsAbstract: false, })
-                    {
-                        var typeDisplayString = model.ToDisplayString();
-                        syntaxInfo = new RegisterDataLoaderInfo(typeDisplayString);
-                        return true;
-                    }
+                    var typeDisplayString = model.ToDisplayString();
+                    syntaxInfo = new RegisterDataLoaderInfo(typeDisplayString);
+                    return true;
                 }
             }
         }
