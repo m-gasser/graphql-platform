@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using HotChocolate.Types.Analyzers.Filters;
 using HotChocolate.Types.Analyzers.Models;
@@ -24,14 +23,34 @@ public class ClassBaseClassInspector : ISyntaxInspector
         }
 
         var baseTypeSymbols = baseList.Types
-            .Select(t => context.SemanticModel.GetSymbolInfo(t.Type).Symbol)
-            .OfType<ITypeSymbol>()
+            .Select(t => context.SemanticModel.GetTypeInfo(t.Type).Type)
+            .Where(t => MightBeRelevantType(t))
             .ToList();
-        if (baseTypeSymbols.All(t => t.ContainingNamespace.ConstituentNamespaces[0].Name is not ("HotChocolate" or "GreenDonut")))
+        if (!baseTypeSymbols.Any())
         {
             syntaxInfo = null;
             return false;
         }
+
+        static bool MightBeRelevantType(ITypeSymbol? typeSymbol)
+        {
+            return typeSymbol switch
+            {
+                null => false,
+                { ContainingNamespace: { } ns } when IsRelevantNamespace(ns) => true,
+                { BaseType: { } baseType } => MightBeRelevantType(baseType),
+                { AllInterfaces: { Length: > 0 } interfaces } => interfaces.Any(i => IsRelevantNamespace(i.ContainingNamespace)),
+                _ => false
+            };
+
+            static bool IsRelevantNamespace(INamespaceSymbol namespaceSymbol)
+            {
+                var ns = namespaceSymbol.ToDisplayString();
+                return ns.StartsWith("HotChocolate") || ns.StartsWith("GreenDonut");
+            }
+        }
+
+        var model = context.SemanticModel.GetDeclaredSymbol(possibleType);
 
         foreach (var baseTypeSymbol in baseTypeSymbols)
         {
@@ -39,7 +58,6 @@ public class ClassBaseClassInspector : ISyntaxInspector
                 .SelectMany(n => context.SemanticModel.Compilation.GetTypesByMetadataName(n))
                 .Any(t => context.SemanticModel.Compilation.HasImplicitConversion(baseTypeSymbol, t)))
             {
-                var model = context.SemanticModel.GetDeclaredSymbol(possibleType);
                 if (model is { IsAbstract: false, })
                 {
                     var typeDisplayString = model.ToDisplayString();
@@ -55,7 +73,6 @@ public class ClassBaseClassInspector : ISyntaxInspector
                 .SelectMany(n => context.SemanticModel.Compilation.GetTypesByMetadataName(n))
                 .Any(t => context.SemanticModel.Compilation.HasImplicitConversion(baseTypeSymbol, t)))
             {
-                var model = context.SemanticModel.GetDeclaredSymbol(possibleType);
                 if (model is { IsAbstract: false, })
                 {
                     var typeDisplayString = model.ToDisplayString();
@@ -71,7 +88,6 @@ public class ClassBaseClassInspector : ISyntaxInspector
                 .GetTypesByMetadataName(WellKnownTypes.DataLoader)
                 .Any(t => context.SemanticModel.Compilation.HasImplicitConversion(baseTypeSymbol, t)))
             {
-                var model = context.SemanticModel.GetDeclaredSymbol(possibleType);
                 if (model is { IsAbstract: false, })
                 {
                     var typeDisplayString = model.ToDisplayString();
