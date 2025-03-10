@@ -1,5 +1,7 @@
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
+using System.Text.RegularExpressions;
 using HotChocolate.Types.Analyzers.Filters;
 using HotChocolate.Types.Analyzers.Models;
 using Microsoft.CodeAnalysis;
@@ -11,9 +13,13 @@ namespace HotChocolate.Types.Analyzers.Inspectors;
 
 public class ClassBaseClassInspector : ISyntaxInspector
 {
+    private static readonly Regex stripGenericArgumentsRegex = new(@"[^<]+<(.*)>", RegexOptions.Compiled);
+
     public ImmutableArray<ISyntaxFilter> Filters { get; } = [ClassWithBaseClass.Instance];
 
     public IImmutableSet<SyntaxKind> SupportedKinds { get; } = [SyntaxKind.ClassDeclaration];
+
+    private static readonly ConcurrentDictionary<string, bool> cachedIsRelevantByTypeName = new();
 
     public bool TryHandle(
         GeneratorSyntaxContext context,
@@ -25,32 +31,10 @@ public class ClassBaseClassInspector : ISyntaxInspector
             return false;
         }
 
-        var baseTypeSymbols = baseList.Types
-            .Select(t => context.SemanticModel.GetTypeInfo(t.Type).Type)
-            .Where(t => MightBeRelevantType(t))
-            .ToList();
-        if (!baseTypeSymbols.Any())
+        if (!TryGetRelevantBaseTypes(baseList, context.SemanticModel, out var baseTypeSymbols))
         {
             syntaxInfo = null;
             return false;
-        }
-
-        static bool MightBeRelevantType(ITypeSymbol? typeSymbol)
-        {
-            return typeSymbol switch
-            {
-                null => false,
-                { ContainingNamespace: { } ns } when IsRelevantNamespace(ns) => true,
-                { BaseType: { } baseType } => MightBeRelevantType(baseType),
-                { AllInterfaces: { Length: > 0 } interfaces } => interfaces.Any(i => IsRelevantNamespace(i.ContainingNamespace)),
-                _ => false
-            };
-
-            static bool IsRelevantNamespace(INamespaceSymbol namespaceSymbol)
-            {
-                var ns = namespaceSymbol.ToDisplayString();
-                return ns.StartsWith("HotChocolate") || ns.StartsWith("GreenDonut");
-            }
         }
 
         var model = context.SemanticModel.GetDeclaredSymbol(possibleType);
@@ -102,5 +86,51 @@ public class ClassBaseClassInspector : ISyntaxInspector
 
         syntaxInfo = null;
         return false;
+    }
+
+    private bool TryGetRelevantBaseTypes(BaseListSyntax baseListSyntax, SemanticModel semanticModel, out ImmutableArray<ITypeSymbol> baseTypeSymbols)
+    {
+        var foundBaseTypeSymbols = ImmutableArray.CreateBuilder<ITypeSymbol>();
+        foreach (var baseTypeSyntax in baseListSyntax.Types)
+        {
+            var typeName = stripGenericArgumentsRegex.Replace(baseTypeSyntax.ToString(), "");
+            bool isRelevantBaseType = cachedIsRelevantByTypeName.GetOrAdd(typeName,
+                static (_, args) =>
+                {
+                    var baseTypeSymbol = args.SemanticModel.GetTypeInfo(args.BaseTypeSyntax.Type).Type;
+                    return MightBeRelevantType(baseTypeSymbol);
+                },
+                (BaseTypeSyntax: baseTypeSyntax, SemanticModel: semanticModel));
+
+            if (isRelevantBaseType)
+            {
+                var baseTypeSymbol = semanticModel.GetTypeInfo(baseTypeSyntax).Type;
+                if (baseTypeSymbol is not null)
+                {
+                    foundBaseTypeSymbols.Add(baseTypeSymbol);
+                }
+            }
+        }
+
+        baseTypeSymbols = foundBaseTypeSymbols.ToImmutable();
+        return baseTypeSymbols.Length > 0;
+
+        static bool MightBeRelevantType(ITypeSymbol? typeSymbol)
+        {
+            return typeSymbol switch
+            {
+                null => false,
+                { ContainingNamespace: { } ns } when IsRelevantNamespace(ns) => true,
+                { BaseType: { } baseType } => MightBeRelevantType(baseType),
+                { AllInterfaces: { Length: > 0 } interfaces } => interfaces.Any(i => IsRelevantNamespace(i.ContainingNamespace)),
+                _ => false
+            };
+
+            static bool IsRelevantNamespace(INamespaceSymbol namespaceSymbol)
+            {
+                var ns = namespaceSymbol.ToDisplayString();
+                return ns.StartsWith("HotChocolate") || ns.StartsWith("GreenDonut");
+            }
+        }
     }
 }
