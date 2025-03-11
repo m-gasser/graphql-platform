@@ -71,13 +71,13 @@ public class InterfaceTypeInfoInspector(string fullyQualifiedAttributeName) : IA
             Array.Resize(ref resolvers, i);
         }
 
-        var syntaxInfo = new InterfaceTypeExtensionInfo(
+        var syntaxInfo = new InterfaceTypeInfo(
             classSymbol,
             runtimeType,
             possibleType,
             i == 0
                 ? ImmutableArray<Resolver>.Empty
-                : resolvers.ToImmutableArray());
+                : [..resolvers]);
 
         if (diagnostics.Length > 0)
         {
@@ -139,7 +139,7 @@ public class InterfaceTypeInfoInspector(string fullyQualifiedAttributeName) : IA
             resolverType.Name,
             resolverMethod,
             resolverMethod.GetResultKind(),
-            resolverParameters.ToImmutableArray(),
+            [..resolverParameters],
             ImmutableArray<MemberBinding>.Empty);
     }
 }
